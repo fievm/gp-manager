@@ -1,4 +1,4 @@
-module gp-manager
+module github.com/fievm/gp-manager
 
 go 1.25.4
 

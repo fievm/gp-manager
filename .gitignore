@@ -1,32 +1,94 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Go - Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
+*.so.*
 *.dylib
 
-# Test binary, built with `go test -c`
+# Go - Test binary, built with `go test -c`
 *.test
 
-# Code coverage profiles and other test artifacts
+# Go - Output of the go coverage tool
 *.out
+*.cover
 coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
+# Go - Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Go - Binaries built with go build
+dist/
+bin/
 
 # Go workspace file
 go.work
 go.work.sum
 
-# env file
+# Environment files
 .env
+.env.local
+.env.*.local
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# IDE - JetBrains (IntelliJ, GoLand, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+.DS_Store
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# IDE - Vim
+.vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# OS - macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# OS - Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# OS - Linux
+.directory
+
+# Build artifacts and object files
+*.o
+*.a
+*.so.*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# IDEs and editors
+.project
+.classpath
+*.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Profiling data
+*.prof
+*.profdata
