@@ -17,12 +17,53 @@ A graceful Go process manager for handling graceful shutdowns, background jobs, 
 
 - **Manager**: Central component for managing application lifecycle
 - **Running Jobs**: Execute background tasks that respect shutdown signals
+  - Receive `jobShutdownContext` to monitor shutdown signals
+  - Jobs should exit gracefully when `jobShutdownContext.Done()` fires
 - **Shutdown Jobs**: Register cleanup tasks to run during graceful shutdown
+  - Execute after all running jobs have stopped
+  - Perfect for closing database connections, flushing logs, etc.
 - **Goroutine Management**: Proper synchronization and cleanup of goroutines
 - **Error Handling**: Panic recovery and error collection across all jobs
 - **Logger Integration**: Built-in Uber Zap logger integration
+- **Dual Context System**:
+  - `jobShutdownContext`: Signals running jobs to stop gracefully
+  - `managerDoneContext`: Signals when entire shutdown is complete
 
-## Installation
+## Shutdown Flow
+
+When a shutdown signal is received (SIGINT, SIGTERM, or parent context cancellation), gp-manager follows this sequence:
+
+1. **Signal Detection**: Receives OS signal or parent context cancellation
+2. **Running Jobs Stop** (`jobShutdownContext` cancelled):
+   - All running jobs receive the cancellation signal
+   - Jobs monitor `jobShutdownContext.Done()` to exit gracefully
+   - Each job finishes its current operation cleanly
+3. **Cleanup Phase** (Shutdown Jobs Execute):
+   - Once all running jobs have stopped, shutdown jobs execute
+   - These handle resource cleanup (close DB, flush data, etc.)
+4. **Completion** (`managerDoneContext` cancelled):
+   - After all cleanup jobs finish, the manager signals completion
+   - External code waiting on `manager.Done()` is notified
+
+```
+Signal → Running Jobs Stop → Cleanup Jobs Run → Manager Done
+```
+
+## Job Types
+
+### Running Jobs
+- Type: `func(context.Context) error`
+- Receives: `jobShutdownContext`
+- Purpose: Long-running processes (HTTP server, message queue consumer, etc.)
+- Responsibility: Monitor context and exit gracefully
+
+### Shutdown Jobs
+- Type: `func() error`
+- Executes: After running jobs have stopped
+- Purpose: Cleanup operations (close connections, flush logs, etc.)
+- Responsibility: Clean up resources before process exit
+| 
+| ## Installation
 
 ```bash
 go get github.com/yourusername/gp-manager
@@ -54,10 +95,10 @@ func main() {
 	mgr := gp_manager.NewManager(ctx, logger)
 	
 	// Add a running job
-	mgr.AddRunningJob(func(shutdownCtx context.Context) error {
+	mgr.AddRunningJob(func(jobShutdownCtx context.Context) error {
 		for {
 			select {
-			case <-shutdownCtx.Done():
+			case <-jobShutdownCtx.Done():
 				logger.Info("Job shutting down")
 				return nil
 			default:
@@ -84,15 +125,22 @@ func main() {
 
 - **NewManager(ctx context.Context, logger *zap.Logger) *Manager**: Initialize a new manager
 - **GetManager() *Manager**: Get the singleton manager instance
-- **AddRunningJob(f RunningJob)**: Add a background job
+- **AddRunningJob(f RunningJob)**: Add a background job that receives jobShutdownContext
 - **AddShutdownJob(f ShutdownJob)**: Add a cleanup job for shutdown
-- **ShutdownContext() context.Context**: Get the shutdown context
-- **Done() <-chan struct{}**: Get channel that closes when manager is done
+- **ShutdownContext() context.Context**: Get the job shutdown context (signals running jobs to stop)
+- **Done() <-chan struct{}**: Get channel that closes when manager is completely done
 
 ### Job Types
 
-- **RunningJob**: `func(context.Context) error` - Long-running background job
-- **ShutdownJob**: `func() error` - Cleanup job executed at shutdown
+- **RunningJob**: `func(context.Context) error`
+  - Receives `jobShutdownContext` as the context parameter
+  - Should monitor `jobShutdownContext.Done()` for shutdown signal
+  - Examples: HTTP servers, database clients, message queue consumers
+  
+- **ShutdownJob**: `func() error`
+  - Executed after running jobs have stopped
+  - Used for cleanup and resource release
+  - Examples: Close database connections, flush logs, save state
 
 ## Platform Support
 

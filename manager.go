@@ -24,27 +24,27 @@ type (
 
 // Manager manages the graceful shutdown process
 type Manager struct {
-	lock              *sync.RWMutex
-	shutdownCtx       context.Context
-	shutdownCtxCancel context.CancelFunc
-	doneCtx           context.Context
-	doneCtxCancel     context.CancelFunc
-	logger            *zap.Logger
-	runningWaitGroup  *routineGroup
-	errors            []error
-	runAtShutdown     []ShutdownJob
+	lock                     *sync.RWMutex
+	jobShutdownContext       context.Context
+	jobShutdownContextCancel context.CancelFunc
+	managerDoneContext       context.Context
+	managerDoneContextCancel context.CancelFunc
+	logger                   *zap.Logger
+	runningWaitGroup         *routineGroup
+	errors                   []error
+	runAtShutdown            []ShutdownJob
 }
 
 func (g *Manager) start(ctx context.Context) {
-	g.shutdownCtx, g.shutdownCtxCancel = context.WithCancel(ctx)
-	g.doneCtx, g.doneCtxCancel = context.WithCancel(context.Background())
+	g.jobShutdownContext, g.jobShutdownContextCancel = context.WithCancel(ctx)
+	g.managerDoneContext, g.managerDoneContextCancel = context.WithCancel(context.Background())
 
 	go g.handleSignals(ctx)
 }
 
 // doGracefulShutdown graceful shutdown all task
 func (g *Manager) doGracefulShutdown() {
-	g.shutdownCtxCancel()
+	g.jobShutdownContextCancel()
 	// doing shutdown job
 	for _, f := range g.runAtShutdown {
 		func(run ShutdownJob) {
@@ -56,7 +56,7 @@ func (g *Manager) doGracefulShutdown() {
 	go func() {
 		g.waitForJobs()
 		g.lock.Lock()
-		g.doneCtxCancel()
+		g.managerDoneContextCancel()
 		g.lock.Unlock()
 	}()
 }
@@ -134,7 +134,7 @@ func (g *Manager) AddRunningJob(f RunningJob) {
 				g.lock.Unlock()
 			}
 		}()
-		if err := f(g.shutdownCtx); err != nil {
+		if err := f(g.jobShutdownContext); err != nil {
 			g.lock.Lock()
 			g.errors = append(g.errors, err)
 			g.lock.Unlock()
@@ -144,12 +144,12 @@ func (g *Manager) AddRunningJob(f RunningJob) {
 
 // Done allows the manager to be viewed as a context.Context.
 func (g *Manager) Done() <-chan struct{} {
-	return g.doneCtx.Done()
+	return g.managerDoneContext.Done()
 }
 
 // ShutdownContext returns a context.Context that is Done at shutdown
 func (g *Manager) ShutdownContext() context.Context {
-	return g.shutdownCtx
+	return g.jobShutdownContext
 }
 
 func newManager(ctx context.Context, logger *zap.Logger) *Manager {
